@@ -87,6 +87,18 @@ stdenv.mkDerivation (finalAttrs: {
     source ${npmHooks.npmConfigHook}/nix-support/setup-hook
     npmRoot=src/typescript/api npmDeps=${finalAttrs.apiDeps} npmConfigHook
     npmRoot=src/typescript/extension-manager npmDeps=${finalAttrs.extensionManagerDeps} npmConfigHook
+  ''
+  # dprint-node (transitive dep via ts-proto -> ts-poet) only ships prebuilt
+  # native binaries for x86_64 and aarch64, so `require()`-ing it throws at
+  # module load time on other archs:
+  # https://github.com/devongovett/dprint-node/blob/v1.0.8/.github/workflows/tag-release.yml
+  # Truncating index.js makes the import return {}; ts-poet's maybePretty wraps
+  # the subsequent dprint.format(...) call in try/catch and falls back to
+  # unformatted code on failure.
+  + lib.optionalString (!stdenv.hostPlatform.isx86_64 && !stdenv.hostPlatform.isAarch64) ''
+    for f in src/typescript/*/node_modules/dprint-node/index.js; do
+      : > "$f"
+    done
   '';
 
   qtWrapperArgs = [
